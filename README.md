@@ -89,6 +89,20 @@ eval summary. `HoverEasy-v0` spawns the drone airborne (pure attitude-stabilised
 hover) — far more learnable from scratch than the ground-spawn tasks, which
 require learning takeoff.
 
+Render a trained policy's flight to a cinematic 3D video (requires the `render`
+extra; uses PyVista with a real drone model and moving cameras):
+
+```bash
+pip install -e ".[rl,render]"
+python examples/render_flight.py --env HoverEasy-v0 --camera chase --out flight.mp4
+python examples/render_flight.py --env HoverEasy-v0 --camera pov    # onboard view
+python examples/render_flight.py --env HoverEasy-v0 --camera orbit  # static wide shot
+```
+
+Two renderers ship: `MatplotlibRenderer` (zero-dep, fixed-camera live window,
+the default `render_mode="human"`) and `PyVistaRenderer` (optional, chase/POV/
+orbit cameras, saved MP4/GIF).
+
 Run the tests:
 
 ```bash

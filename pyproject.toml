@@ -24,6 +24,13 @@ dev = [
 rl = [
     "stable-baselines3>=2.3",
 ]
+# Cinematic 3D rendering (chase/POV cameras, saved MP4/GIF). Optional; the core
+# env and the default matplotlib renderer never require these.
+render = [
+    "pyvista>=0.43",
+    "imageio>=2.31",
+    "imageio-ffmpeg>=0.4",
+]
 
 [tool.setuptools.packages.find]
 include = ["rotorenv*"]

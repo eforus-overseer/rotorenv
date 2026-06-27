@@ -8,12 +8,20 @@ Guidance for Claude Code (and humans) working in this repository.
 reinforcement learning environment for training autonomous quadrotor agents. Pure
 Python, physics-first, built to be extended incrementally in phases.
 
-**Current phase: Phase 5 (complete)** — PPO training pipeline. `examples/train_ppo.py`
-trains/evaluates/plots/replays a stable-baselines3 PPO policy; SB3 is an
-*optional* `[rl]` extra (core env stays ML-framework-free). Verified the env is
-learnable: eval reward climbs ~2.7→11.9 over 50k steps on `HoverEasy-v0`.
-Built on Phases 1–4 (point mass, 6-DOF, enum spaces/check_env/wrappers, tasks +
-curriculum).
+**Current phase: Phase 6 (in progress)** — "MiniGrid in 3D" procedural
+navigation. `NavigationEnv`: random pillar obstacle field, fly start→goal
+without colliding, obstacle count scales with curriculum difficulty. Mechanics
+(collision, goal, reward, layout) are done + tested; `Navigation-v0` /
+`Navigation6DOF-v0` registered. **Next:** PEDRA-style depth-camera perception
+(`perception="depth"`) + CNN policy — the user explicitly chose pixel perception
+over state-vector, which means renderer-in-the-training-loop (slow, GPU/long-run
+territory; see [[rotorenv-vision-3d-navigation]]).
+
+Phase 5 — PPO training pipeline. `examples/train_ppo.py` trains/eval/plots/
+replays SB3 PPO; SB3 is the optional `[rl]` extra. Env verified learnable
+(~2.7→11.9 over 50k steps on `HoverEasy-v0`). Phases 1–4: point mass, 6-DOF,
+enum spaces/check_env/wrappers, tasks + curriculum. Optional `[render]` extra =
+PyVista cinematic renderer (chase/POV/orbit), GIFs in docs/media.
 
 **Key training lesson:** ground-spawn tasks (z=0, crash at z<0) are nearly
 unlearnable from scratch — a cold policy crashes on step 1 (reward flat at

@@ -113,6 +113,20 @@ class PyVistaRenderer:
             actors.append(self.plotter.add_mesh(disk, color=col, opacity=0.85))
         return actors
 
+    def add_obstacles(self, obstacles: np.ndarray) -> None:
+        """Add static box obstacles to the scene (call once per episode).
+
+        Args:
+            obstacles: ``(N, 6)`` array of ``[cx, cy, cz, hx, hy, hz]``
+                axis-aligned boxes (centre + half-extents).
+        """
+        pv = self._pv
+        for box in np.asarray(obstacles, dtype=np.float64):
+            c, h = box[:3], box[3:]
+            cube = pv.Cube(center=tuple(c), x_length=2 * h[0],
+                           y_length=2 * h[1], z_length=2 * h[2])
+            self.plotter.add_mesh(cube, color="slategray", opacity=0.9)
+
     def _place_camera(self, state: DroneState) -> None:
         """Position the camera according to ``camera_mode`` for this frame."""
         rot = euler_to_rotmat(state.orientation)

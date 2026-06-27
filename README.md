@@ -17,6 +17,17 @@ holds the translucent target, gold line is its flight trail.
 > drifts — proof the env is learnable, not a finished pilot. Longer training
 > tightens it. Reproduce with `examples/train_ppo.py` + `examples/render_flight.py`.
 
+## Procedural obstacle-field navigation (`Navigation-v0`)
+
+"MiniGrid in 3D": each episode spawns a random field of pillar obstacles; the
+drone must fly start → goal without colliding. Obstacle count scales with
+curriculum difficulty.
+
+![navigation](docs/media/navigation_orbit.gif)
+
+> Flown here by a *scripted* controller just to show the procedural layout — no
+> trained navigation policy yet (perception/training is the next phase).
+
 ## Status
 
 **Phase 1 (complete)**

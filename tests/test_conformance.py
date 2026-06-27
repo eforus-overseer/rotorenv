@@ -27,6 +27,8 @@ from rotorenv.envs.hover_env import HoverEnv
         "Waypoint6DOF-v0",
         "Trajectory-v0",
         "Trajectory6DOF-v0",
+        "Navigation-v0",
+        "Navigation6DOF-v0",
     ],
 )
 def test_registered_envs_pass_check_env(env_id: str) -> None:

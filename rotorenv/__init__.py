@@ -17,6 +17,7 @@ __version__ = "0.1.0"
 _HOVER = "rotorenv.envs.hover_env:HoverEnv"
 _WAYPOINT = "rotorenv.envs.waypoint_env:WaypointEnv"
 _TRAJECTORY = "rotorenv.envs.trajectory_env:TrajectoryEnv"
+_NAVIGATION = "rotorenv.envs.navigation_env:NavigationEnv"
 
 # Registered task variants: (entry_point, max_episode_steps, kwargs). Many small
 # registered variants over a few task classes mirrors MiniGrid; selecting
@@ -38,6 +39,9 @@ _VARIANTS: dict[str, tuple[str, int, dict[str, Any]]] = {
     # Trajectory family (Phase 4)
     "Trajectory-v0": (_TRAJECTORY, 600, {}),
     "Trajectory6DOF-v0": (_TRAJECTORY, 600, {"physics_model": "six_dof"}),
+    # Navigation family (Phase 6): procedural obstacle field -> goal.
+    "Navigation-v0": (_NAVIGATION, 750, {}),
+    "Navigation6DOF-v0": (_NAVIGATION, 750, {"physics_model": "six_dof"}),
 }
 
 for _env_id, (_entry, _max_steps, _kwargs) in _VARIANTS.items():

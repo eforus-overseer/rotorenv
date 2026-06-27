@@ -6,8 +6,12 @@ import gymnasium as gym
 import numpy as np
 
 import rotorenv
-from rotorenv.envs.base_env import ACT_DIM, OBS_DIM
+from rotorenv.core.enums import ACTION_DIMS, OBSERVATION_DIMS, ActionType, ObservationType
 from rotorenv.envs.hover_env import HoverEnv
+
+# Default space dims: FULL observation (16,) and ATTITUDE action (4,).
+OBS_DIM = OBSERVATION_DIMS[ObservationType.FULL]
+ACT_DIM = ACTION_DIMS[ActionType.ATTITUDE]
 
 
 def test_registered_and_makeable() -> None:
@@ -18,10 +22,28 @@ def test_registered_and_makeable() -> None:
 
 
 def test_observation_and_action_space_shapes() -> None:
-    """Spaces match the spec: obs (13,), action (4,)."""
+    """Default spaces: FULL obs (16,), ATTITUDE action (4,)."""
     env = HoverEnv()
     assert env.observation_space.shape == (OBS_DIM,)
     assert env.action_space.shape == (ACT_DIM,)
+
+
+def test_minimal_observation_is_13d() -> None:
+    """The MINIMAL observation reproduces the legacy (13,) layout."""
+    env = HoverEnv(observation_type="minimal")
+    assert env.observation_space.shape == (13,)
+    obs, _info = env.reset(seed=0)
+    assert obs.shape == (13,)
+
+
+def test_thrust_only_action_is_1d() -> None:
+    """THRUST_ONLY exposes a 1-D action and holds attitude commands at zero."""
+    env = HoverEnv(action_type="thrust_only")
+    assert env.action_space.shape == (1,)
+    env.reset(seed=0)
+    obs, _r, terminated, _trunc, _info = env.step(np.array([1.0], dtype=np.float32))
+    assert not terminated  # full thrust climbs
+    assert obs[2] > 0.0
 
 
 def test_reset_returns_valid_obs() -> None:

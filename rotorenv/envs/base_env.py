@@ -9,22 +9,24 @@ re-implement the step loop or the spaces.
 
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Any, Optional, Union
 
 import gymnasium as gym
 import numpy as np
 from gymnasium import spaces
 
 from rotorenv.core.action import DroneAction
+from rotorenv.core.enums import (
+    ACTION_DIMS,
+    OBSERVATION_DIMS,
+    ActionType,
+    ObservationType,
+)
 from rotorenv.core.reward import RewardTerm
 from rotorenv.core.state import DroneState
 from rotorenv.physics.base_physics import DronePhysics
 from rotorenv.physics.point_mass import PointMassPhysics
 from rotorenv.physics.six_dof import SixDOFPhysics
-
-# Observation layout (13,): position(3) velocity(3) orientation(3) distance(3) time(1).
-OBS_DIM = 13
-ACT_DIM = 4
 
 
 class DroneEnv(gym.Env):
@@ -45,6 +47,8 @@ class DroneEnv(gym.Env):
         self,
         physics: Optional[DronePhysics] = None,
         physics_model: str = "point_mass",
+        observation_type: Union[ObservationType, str] = ObservationType.FULL,
+        action_type: Union[ActionType, str] = ActionType.ATTITUDE,
         render_mode: Optional[str] = None,
     ) -> None:
         """Initialise spaces, physics backend, and reward function.
@@ -56,18 +60,26 @@ class DroneEnv(gym.Env):
                 ``physics`` is not supplied. One of ``"point_mass"`` (Phase 1)
                 or ``"six_dof"`` (Phase 2). Strings are used so the backend is
                 selectable through the Gymnasium registry.
+            observation_type: Which fields to expose in the observation. See
+                :class:`~rotorenv.core.enums.ObservationType`. Defaults to
+                ``FULL`` (16-D, includes angular velocity).
+            action_type: Action-space layout. See
+                :class:`~rotorenv.core.enums.ActionType`. Defaults to
+                ``ATTITUDE`` (4-D ``[thrust, roll, pitch, yaw]``).
             render_mode: Optional Gymnasium render mode (``"human"``).
         """
         super().__init__()
         self.physics: DronePhysics = (
             physics if physics is not None else self._make_physics(physics_model)
         )
+        self.observation_type = ObservationType(observation_type)
+        self.action_type = ActionType(action_type)
         self.render_mode = render_mode
 
-        self.action_space = spaces.Box(-1.0, 1.0, shape=(ACT_DIM,), dtype=np.float32)
-        self.observation_space = spaces.Box(
-            -np.inf, np.inf, shape=(OBS_DIM,), dtype=np.float32
-        )
+        act_dim = ACTION_DIMS[self.action_type]
+        self.action_space = spaces.Box(-1.0, 1.0, shape=(act_dim,), dtype=np.float32)
+        low, high = self._observation_bounds()
+        self.observation_space = spaces.Box(low, high, dtype=np.float32)
 
         self.reward_fn: RewardTerm = self._build_reward()
         self.state: Optional[DroneState] = None
@@ -125,24 +137,70 @@ class DroneEnv(gym.Env):
     # ------------------------------------------------------------------ #
     # Gymnasium API.                                                      #
     # ------------------------------------------------------------------ #
-    def _get_obs(self, state: DroneState) -> np.ndarray:
-        """Flatten a state into the 13-D observation vector.
+    # Generous physical limits used to give the observation space *finite*
+    # bounds (the Gymnasium env-checker flags -inf/+inf as uninformative).
+    _POS_LIMIT = 20.0       # m
+    _VEL_LIMIT = 50.0       # m/s
+    _ANG_LIMIT = np.pi      # rad (wrapped)
+    _ANGVEL_LIMIT = 50.0    # rad/s
+    _TIME_LIMIT = 1.0e4     # s
 
-        Layout: ``[position(3), velocity(3), orientation(3),
-        distance_to_target(3), time(1)]``. Note angular velocity is *not*
-        included, by design, to hit the specified ``(13,)`` shape.
+    def _observation_bounds(self) -> tuple[np.ndarray, np.ndarray]:
+        """Return ``(low, high)`` arrays bounding the observation space.
+
+        Bounds are per-field and finite so that normalisation wrappers and
+        algorithms reading ``space.high``/``space.low`` behave. Layout matches
+        :meth:`_get_obs` for the active ``observation_type``.
+        """
+        p, v, a, t = self._POS_LIMIT, self._VEL_LIMIT, self._ANG_LIMIT, self._TIME_LIMIT
+        # position(3), velocity(3), orientation(3), distance_to_target(3), time(1)
+        high = [p, p, p, v, v, v, a, a, a, 2 * p, 2 * p, 2 * p, t]
+        if self.observation_type is ObservationType.FULL:
+            high += [self._ANGVEL_LIMIT] * 3   # angular_velocity(3)
+        high_arr = np.array(high, dtype=np.float32)
+        # Symmetric except time and the position-derived fields stay non-negative
+        # only where physical; keeping it symmetric is simplest and valid.
+        low_arr = -high_arr.copy()
+        low_arr[12] = 0.0   # time is non-negative
+        return low_arr, high_arr
+
+    def _get_obs(self, state: DroneState) -> np.ndarray:
+        """Flatten a state into the observation vector for ``observation_type``.
+
+        ``MINIMAL`` (13,): ``[position(3), velocity(3), orientation(3),
+        distance_to_target(3), time(1)]``.
+        ``FULL`` (16,): the above with ``angular_velocity(3)`` appended.
         """
         distance_to_target = self.target - state.position
-        obs = np.concatenate(
-            [
-                state.position,
-                state.velocity,
-                state.orientation,
-                distance_to_target,
-                [state.time],
-            ]
-        )
-        return obs.astype(np.float32)
+        fields = [
+            state.position,
+            state.velocity,
+            state.orientation,
+            distance_to_target,
+            [state.time],
+        ]
+        if self.observation_type is ObservationType.FULL:
+            fields.append(state.angular_velocity)
+        return np.concatenate(fields).astype(np.float32)
+
+    def _preprocess_action(self, action: np.ndarray) -> DroneAction:
+        """Map a raw policy action to a :class:`DroneAction` per ``action_type``.
+
+        For ``ATTITUDE`` the 4-vector is ``[thrust, roll, pitch, yaw]``. For
+        ``THRUST_ONLY`` the 1-vector is ``[thrust]`` and roll/pitch/yaw are held
+        at zero. In both cases the thrust channel is rescaled ``[-1,1] -> [0,1]``
+        by :meth:`DroneAction.from_array`.
+
+        Args:
+            action: Raw action whose length matches the action space.
+
+        Returns:
+            The structured command to hand to the physics backend.
+        """
+        action = np.asarray(action, dtype=np.float64).reshape(-1)
+        if self.action_type is ActionType.THRUST_ONLY:
+            action = np.array([action[0], 0.0, 0.0, 0.0], dtype=np.float64)
+        return DroneAction.from_array(action)
 
     def _get_info(self, state: DroneState) -> dict[str, Any]:
         """Return diagnostic info (Euclidean distance to target)."""
@@ -173,7 +231,8 @@ class DroneEnv(gym.Env):
         """Apply one action and return the Gymnasium 5-tuple.
 
         Args:
-            action: Raw policy action in ``[-1, 1]^4`` (``[thrust, roll, pitch, yaw]``).
+            action: Raw policy action in ``[-1, 1]``, length matching the action
+                space (4 for ``ATTITUDE``, 1 for ``THRUST_ONLY``).
 
         Returns:
             ``(observation, reward, terminated, truncated, info)``.
@@ -181,7 +240,7 @@ class DroneEnv(gym.Env):
         if self.state is None:
             raise RuntimeError("step() called before reset().")
 
-        drone_action = DroneAction.from_array(np.asarray(action, dtype=np.float64))
+        drone_action = self._preprocess_action(action)
         self.state = self.physics.step(self.state, drone_action)
 
         terminated, crashed = self._is_terminated(self.state)

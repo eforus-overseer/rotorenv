@@ -17,8 +17,16 @@ Python, physics-first, and designed to be extended incrementally.
 - `Hover6DOF-v0`: same hover task on the 6-DOF backend
 - Upgraded 3D renderer: a quadrotor cross that **tilts with true attitude**,
   body-up axis, and a fading trajectory trail
-- The action contract is unchanged (`[thrust, roll, pitch, yaw]`), so Phase-1
-  policies run on Phase-2 physics without modification
+
+**Phase 3 (complete) — mature-env architecture**
+- Enum-configurable spaces (`ObservationType`, `ActionType`), following the
+  `gym-pybullet-drones` pattern — obs/action shapes are configuration, not
+  hardcoded constants
+- Finite, physically-bounded observation space (passes
+  `gymnasium.utils.env_checker.check_env`)
+- Example wrappers (`NormalizeObservation`, `RewardScale`) + vectorized-env
+  support via `gymnasium.make_vec`
+- Four registered variants over one base env (MiniGrid-style)
 
 ## Install
 
@@ -88,10 +96,27 @@ rotorenv/
 
 ### Registered environments
 
-| ID | Physics | Notes |
-|----|---------|-------|
-| `Hover-v0` | `PointMassPhysics` | Phase 1; thrust tilts with orientation |
-| `Hover6DOF-v0` | `SixDOFPhysics` | Phase 2; full rigid-body, quaternion attitude |
+| ID | Physics | Obs | Action | Notes |
+|----|---------|-----|--------|-------|
+| `Hover-v0` | point mass | full (16,) | attitude (4,) | default task |
+| `Hover6DOF-v0` | 6-DOF | full (16,) | attitude (4,) | full rigid-body, quaternion attitude |
+| `HoverMinimal-v0` | point mass | minimal (13,) | attitude (4,) | legacy obs (no angular vel.) |
+| `HoverThrustOnly-v0` | point mass | full (16,) | thrust (1,) | vertical-only control |
+
+All are the same `HoverEnv` with different registry `kwargs`. Build any
+configuration directly too:
+
+```python
+import rotorenv
+from rotorenv.envs import NormalizeObservation
+
+env = rotorenv.make("Hover6DOF-v0")
+env = NormalizeObservation(env)          # rescale obs into [-1, 1]
+
+# Or configure spaces explicitly:
+from rotorenv.envs.hover_env import HoverEnv
+env = HoverEnv(observation_type="minimal", action_type="thrust_only")
+```
 
 ### Domain model
 
@@ -103,10 +128,19 @@ rotorenv/
 | `angular_velocity` | (3,) | rad/s |
 | `time` | scalar | elapsed [s] |
 
-**Observation** (13,): `position(3) + velocity(3) + orientation(3) + distance_to_target(3) + time(1)`.
+**Observation** (selected by `ObservationType`):
+- `minimal` (13,): `position(3) + velocity(3) + orientation(3) + distance_to_target(3) + time(1)`
+- `full` (16,, **default**): the above + `angular_velocity(3)`
 
-**Action** (4,): `[thrust, roll, pitch, yaw]` in `[-1, 1]`; thrust is rescaled to
-`[0, 1]` so a neutral `0` command is a 50% throttle hover.
+The observation space has finite, physically-motivated bounds (so it passes
+`check_env` and works with normalization wrappers).
+
+**Action** (selected by `ActionType`):
+- `attitude` (4,, **default**): `[thrust, roll, pitch, yaw]` in `[-1, 1]`
+- `thrust_only` (1,): `[thrust]`; roll/pitch/yaw held at zero
+
+Thrust is rescaled `[-1, 1] -> [0, 1]` so a neutral `0` command is a 50%
+throttle hover.
 
 ## License
 

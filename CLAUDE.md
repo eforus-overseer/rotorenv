@@ -8,10 +8,15 @@ Guidance for Claude Code (and humans) working in this repository.
 reinforcement learning environment for training autonomous quadrotor agents. Pure
 Python, physics-first, built to be extended incrementally in phases.
 
-**Current phase: Phase 2 (complete)** — full 6-DOF rigid-body physics alongside
-the Phase-1 point mass. Two registered tasks (`Hover-v0` → point mass,
-`Hover6DOF-v0` → 6-DOF), no ML framework dependency. The environment is the
-product; policies come later.
+**Current phase: Phase 3 (complete)** — mature-env architecture: enum-configured
+spaces, `check_env` conformance, wrappers, vectorized-env support, four
+registered variants. Built on Phase 1 (point mass) + Phase 2 (6-DOF). Still no
+ML framework dependency. The environment is the product; policies come later.
+
+We deliberately mirror how established Gymnasium envs are built
+(`gym-pybullet-drones`, MiniGrid) rather than inventing conventions — see the
+project memory note. Prefer enum-configurable spaces, registered task variants,
+and wrappers over bespoke env code.
 
 ## Environment setup (read before installing)
 
@@ -31,8 +36,9 @@ Run things with the venv interpreter (`.venv/bin/python`) if the env isn't activ
 ```bash
 python examples/random_agent.py    # sanity check: 3 random episodes, prints return
 python examples/render_6dof.py     # live 3D window: tilting quad + trajectory trail
-pytest                             # full test suite (currently 38 tests)
-pytest tests/test_six_dof.py -q    # one module
+python examples/wrapped_agent.py   # wrappers + vectorized-env demo
+pytest                             # full test suite (currently 50 tests)
+pytest tests/test_conformance.py   # Gymnasium check_env across all variants
 ```
 
 ## Architecture — keep these concerns separate
@@ -88,12 +94,21 @@ rotorenv/
 vector is `[-1,1]^4`; `DroneAction.from_array` rescales thrust so a neutral `0`
 command = 50% throttle (hover).
 
-**Observation** `(13,)`: `position(3) + velocity(3) + orientation(3) +
-distance_to_target(3) + time(1)`. `angular_velocity` is intentionally excluded to
-hit `(13,)` — if you add it, bump the shape in `envs/base_env.py:OBS_DIM` and
-update `_get_obs` together.
+**Observation & action shapes are enum-configured** (`core/enums.py`), not fixed
+constants — this is the `gym-pybullet-drones` pattern. Shapes come from
+`OBSERVATION_DIMS[obs_type]` / `ACTION_DIMS[act_type]`; `_get_obs` and
+`_preprocess_action` branch on the enum. To add a mode, add an enum member + its
+dim + a branch — do **not** reintroduce a hardcoded `OBS_DIM`.
 
-**Action space** `(4,)`: `Box(-1, 1)` = `[thrust, roll, pitch, yaw]`.
+- `ObservationType.FULL` (16,, default): minimal + `angular_velocity(3)`.
+- `ObservationType.MINIMAL` (13,): `position + velocity + orientation +
+  distance_to_target + time` (legacy Phase 1/2 layout).
+- `ActionType.ATTITUDE` (4,, default): `[thrust, roll, pitch, yaw]`.
+- `ActionType.THRUST_ONLY` (1,): `[thrust]`, attitude held at zero.
+
+The observation `Box` has **finite** per-field bounds (`_observation_bounds`) so
+it passes `check_env` and works with normalization wrappers — never revert to
+`Box(-inf, inf)`.
 
 ## Design decisions worth knowing
 

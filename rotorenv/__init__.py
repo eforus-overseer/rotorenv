@@ -14,21 +14,28 @@ from gymnasium.envs.registration import register
 
 __version__ = "0.1.0"
 
-# Register environment IDs exactly once, even on repeated imports.
-if "Hover-v0" not in gym.registry:
-    register(
-        id="Hover-v0",
-        entry_point="rotorenv.envs.hover_env:HoverEnv",
-        max_episode_steps=500,  # 10 s at dt=0.02
-    )
+_ENTRY_POINT = "rotorenv.envs.hover_env:HoverEnv"
+_MAX_EPISODE_STEPS = 500  # 10 s at dt=0.02
 
-if "Hover6DOF-v0" not in gym.registry:
-    register(
-        id="Hover6DOF-v0",
-        entry_point="rotorenv.envs.hover_env:HoverEnv",
-        max_episode_steps=500,  # 10 s at dt=0.02
-        kwargs={"physics_model": "six_dof"},
-    )
+# Registered task variants. Each is a (kwargs) configuration over the same
+# HoverEnv, mirroring how mature env libraries expose many small registered
+# variants (MiniGrid) and select behaviour via registry kwargs
+# (gym-pybullet-drones). Defaults: FULL (16-D) obs, point-mass physics.
+_VARIANTS: dict[str, dict[str, Any]] = {
+    "Hover-v0": {},
+    "Hover6DOF-v0": {"physics_model": "six_dof"},
+    "HoverMinimal-v0": {"observation_type": "minimal"},
+    "HoverThrustOnly-v0": {"action_type": "thrust_only"},
+}
+
+for _env_id, _kwargs in _VARIANTS.items():
+    if _env_id not in gym.registry:
+        register(
+            id=_env_id,
+            entry_point=_ENTRY_POINT,
+            max_episode_steps=_MAX_EPISODE_STEPS,
+            kwargs=_kwargs,
+        )
 
 
 def make(env_id: str, **kwargs: Any) -> gym.Env:

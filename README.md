@@ -4,6 +4,19 @@ A lightweight, [Gymnasium](https://gymnasium.farama.org/)-compatible reinforceme
 learning environment for training autonomous drone (quadrotor) agents. Pure
 Python, physics-first, and designed to be extended incrementally.
 
+## A trained PPO policy hovering (6-DOF)
+
+Rendered with the optional PyVista engine. The drone (front rotor in orange)
+holds the translucent target, gold line is its flight trail.
+
+| Chase (3rd-person) | Onboard (POV) | Orbit |
+|:--:|:--:|:--:|
+| ![chase](docs/media/hover_chase.gif) | ![pov](docs/media/hover_pov.gif) | ![orbit](docs/media/hover_orbit.gif) |
+
+> These show a 50k-step smoke-test policy: it holds the hover briefly, then
+> drifts — proof the env is learnable, not a finished pilot. Longer training
+> tightens it. Reproduce with `examples/train_ppo.py` + `examples/render_flight.py`.
+
 ## Status
 
 **Phase 1 (complete)**

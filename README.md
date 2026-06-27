@@ -26,7 +26,17 @@ Python, physics-first, and designed to be extended incrementally.
   `gymnasium.utils.env_checker.check_env`)
 - Example wrappers (`NormalizeObservation`, `RewardScale`) + vectorized-env
   support via `gymnasium.make_vec`
-- Four registered variants over one base env (MiniGrid-style)
+
+**Phase 4 (complete) — tasks + curriculum learning**
+- New tasks over the same base: `WaypointEnv` (reach a sampled target) and
+  `TrajectoryEnv` (track a moving Lissajous-curve target) — the
+  Hover→Waypoint→Trajectory difficulty ladder common to drone-RL projects
+- Difficulty is a first-class `[0, 1]` knob set via `reset(options=...)`; tasks
+  scale their target spread by it
+- `CurriculumWrapper` with two selectable schedules: **success-based**
+  (performance-staged, QuadCtrl-style) and **step-annealed** (quad-swarm-rl's
+  `anneal_*_steps` pattern)
+- Eight registered variants across three task families
 
 ## Install
 
@@ -96,26 +106,34 @@ rotorenv/
 
 ### Registered environments
 
-| ID | Physics | Obs | Action | Notes |
-|----|---------|-----|--------|-------|
-| `Hover-v0` | point mass | full (16,) | attitude (4,) | default task |
-| `Hover6DOF-v0` | 6-DOF | full (16,) | attitude (4,) | full rigid-body, quaternion attitude |
-| `HoverMinimal-v0` | point mass | minimal (13,) | attitude (4,) | legacy obs (no angular vel.) |
-| `HoverThrustOnly-v0` | point mass | full (16,) | thrust (1,) | vertical-only control |
+| ID | Task | Physics | Obs | Action |
+|----|------|---------|-----|--------|
+| `Hover-v0` | hold fixed point | point mass | full (16,) | attitude (4,) |
+| `Hover6DOF-v0` | hold fixed point | 6-DOF | full (16,) | attitude (4,) |
+| `HoverMinimal-v0` | hold fixed point | point mass | minimal (13,) | attitude (4,) |
+| `HoverThrustOnly-v0` | hold fixed point | point mass | full (16,) | thrust (1,) |
+| `Waypoint-v0` | reach sampled target | point mass | full (16,) | attitude (4,) |
+| `Waypoint6DOF-v0` | reach sampled target | 6-DOF | full (16,) | attitude (4,) |
+| `Trajectory-v0` | track moving target | point mass | full (16,) | attitude (4,) |
+| `Trajectory6DOF-v0` | track moving target | 6-DOF | full (16,) | attitude (4,) |
 
-All are the same `HoverEnv` with different registry `kwargs`. Build any
-configuration directly too:
+Each is one task class with different registry `kwargs`. Build configurations
+directly, wrap, or apply a curriculum:
 
 ```python
 import rotorenv
-from rotorenv.envs import NormalizeObservation
+from rotorenv.envs import NormalizeObservation, CurriculumWrapper
 
 env = rotorenv.make("Hover6DOF-v0")
 env = NormalizeObservation(env)          # rescale obs into [-1, 1]
 
-# Or configure spaces explicitly:
+# Configure spaces explicitly:
 from rotorenv.envs.hover_env import HoverEnv
 env = HoverEnv(observation_type="minimal", action_type="thrust_only")
+
+# Curriculum learning (auto-anneals task difficulty):
+env = CurriculumWrapper(rotorenv.make("Waypoint-v0"), mode="success")
+# or step-annealed: mode="step", anneal_steps=200_000
 ```
 
 ### Domain model

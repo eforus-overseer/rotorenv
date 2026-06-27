@@ -81,6 +81,10 @@ class DroneEnv(gym.Env):
         low, high = self._observation_bounds()
         self.observation_space = spaces.Box(low, high, dtype=np.float32)
 
+        # Difficulty in [0, 1]; tasks scale spawn/target spread by it, and the
+        # curriculum wrapper drives it through reset(options={"difficulty": d}).
+        self.difficulty: float = 1.0
+
         self.reward_fn: RewardTerm = self._build_reward()
         self.state: Optional[DroneState] = None
         self.target: np.ndarray = self._make_target()
@@ -133,6 +137,15 @@ class DroneEnv(gym.Env):
     def _is_truncated(self, state: DroneState) -> bool:
         """Return whether the episode hit a non-terminal time/space limit."""
         return False
+
+    def _update_target(self, state: DroneState) -> None:
+        """Advance a time-varying target, if the task has one (default no-op).
+
+        Called once per :meth:`step` after the physics update. Stationary tasks
+        (hover, waypoint) leave ``self.target`` unchanged; trajectory-tracking
+        tasks override this to move the target along a path.
+        """
+        return None
 
     # ------------------------------------------------------------------ #
     # Gymnasium API.                                                      #
@@ -217,8 +230,16 @@ class DroneEnv(gym.Env):
         Seeding goes through ``gym.Env.reset`` which populates
         ``self.np_random`` (a ``numpy`` ``Generator``); subclasses must draw all
         randomness from it rather than the global numpy RNG.
+
+        Args:
+            seed: Optional RNG seed.
+            options: Optional dict. ``{"difficulty": float}`` in ``[0, 1]`` sets
+                the task difficulty for this episode (used by the curriculum
+                wrapper); tasks scale their spawn/target spread by it.
         """
         super().reset(seed=seed)
+        if options is not None and "difficulty" in options:
+            self.difficulty = float(np.clip(options["difficulty"], 0.0, 1.0))
         self.target = self._make_target()
         self.state = self._initial_state()
         if self._renderer is not None:
@@ -242,6 +263,7 @@ class DroneEnv(gym.Env):
 
         drone_action = self._preprocess_action(action)
         self.state = self.physics.step(self.state, drone_action)
+        self._update_target(self.state)
 
         terminated, crashed = self._is_terminated(self.state)
         truncated = self._is_truncated(self.state)

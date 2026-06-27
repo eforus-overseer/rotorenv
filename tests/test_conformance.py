@@ -16,7 +16,19 @@ from rotorenv.core.enums import ActionType, ObservationType
 from rotorenv.envs.hover_env import HoverEnv
 
 
-@pytest.mark.parametrize("env_id", ["Hover-v0", "Hover6DOF-v0"])
+@pytest.mark.parametrize(
+    "env_id",
+    [
+        "Hover-v0",
+        "Hover6DOF-v0",
+        "HoverMinimal-v0",
+        "HoverThrustOnly-v0",
+        "Waypoint-v0",
+        "Waypoint6DOF-v0",
+        "Trajectory-v0",
+        "Trajectory6DOF-v0",
+    ],
+)
 def test_registered_envs_pass_check_env(env_id: str) -> None:
     """Each registered environment satisfies the Gymnasium API contract."""
     import rotorenv

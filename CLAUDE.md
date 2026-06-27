@@ -8,15 +8,16 @@ Guidance for Claude Code (and humans) working in this repository.
 reinforcement learning environment for training autonomous quadrotor agents. Pure
 Python, physics-first, built to be extended incrementally in phases.
 
-**Current phase: Phase 3 (complete)** — mature-env architecture: enum-configured
-spaces, `check_env` conformance, wrappers, vectorized-env support, four
-registered variants. Built on Phase 1 (point mass) + Phase 2 (6-DOF). Still no
-ML framework dependency. The environment is the product; policies come later.
+**Current phase: Phase 4 (complete)** — tasks + curriculum learning. Three task
+families (hover, waypoint, trajectory) × physics/space variants = 8 registered
+envs, plus a `CurriculumWrapper` (success-based or step-annealed). Built on
+Phase 1 (point mass) + Phase 2 (6-DOF) + Phase 3 (enum spaces, check_env,
+wrappers). Still no ML framework dependency.
 
 We deliberately mirror how established Gymnasium envs are built
-(`gym-pybullet-drones`, MiniGrid) rather than inventing conventions — see the
-project memory note. Prefer enum-configurable spaces, registered task variants,
-and wrappers over bespoke env code.
+(`gym-pybullet-drones`, MiniGrid, quad-swarm-rl, QuadCtrl) rather than inventing
+conventions — see the project memory note. Prefer enum-configurable spaces,
+registered task variants, and wrappers over bespoke env code.
 
 ## Environment setup (read before installing)
 
@@ -37,7 +38,8 @@ Run things with the venv interpreter (`.venv/bin/python`) if the env isn't activ
 python examples/random_agent.py    # sanity check: 3 random episodes, prints return
 python examples/render_6dof.py     # live 3D window: tilting quad + trajectory trail
 python examples/wrapped_agent.py   # wrappers + vectorized-env demo
-pytest                             # full test suite (currently 50 tests)
+python examples/curriculum_demo.py # success-based curriculum on Waypoint-v0
+pytest                             # full test suite (currently 72 tests)
 pytest tests/test_conformance.py   # Gymnasium check_env across all variants
 ```
 
@@ -118,6 +120,16 @@ it passes `check_env` and works with normalization wrappers — never revert to
 - **Spawn sits on the crash plane (`z=0`, crash when `z<0`).** The agent must
   learn *takeoff*, not just hold — a neutral action under spawn-tilt noise sinks
   and crashes. To start airborne, change `HoverEnv._initial_state` (one line).
+  (TrajectoryEnv is the exception: it spawns *on* the path.)
+- **Tasks differ only in target + reward + termination.** A new task subclasses
+  `DroneEnv` and overrides `_make_target` (initial target), `_initial_state`,
+  `_build_reward`, `_is_terminated`, and — for a *moving* target — `_update_target`
+  (called each step; default no-op). Don't touch the step loop.
+- **Difficulty is env state, curriculum is a wrapper.** `self.difficulty ∈ [0,1]`
+  is set via `reset(options={"difficulty": d})`; tasks scale spawn/target spread
+  by it. The `CurriculumWrapper` *drives* that value (success-based or
+  step-annealed) — the env stays a pure MDP, the schedule stays composable. Keep
+  it that way: no training-history state inside the env.
 
 ## Working agreement
 

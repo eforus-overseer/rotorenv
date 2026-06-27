@@ -14,26 +14,35 @@ from gymnasium.envs.registration import register
 
 __version__ = "0.1.0"
 
-_ENTRY_POINT = "rotorenv.envs.hover_env:HoverEnv"
-_MAX_EPISODE_STEPS = 500  # 10 s at dt=0.02
+_HOVER = "rotorenv.envs.hover_env:HoverEnv"
+_WAYPOINT = "rotorenv.envs.waypoint_env:WaypointEnv"
+_TRAJECTORY = "rotorenv.envs.trajectory_env:TrajectoryEnv"
 
-# Registered task variants. Each is a (kwargs) configuration over the same
-# HoverEnv, mirroring how mature env libraries expose many small registered
-# variants (MiniGrid) and select behaviour via registry kwargs
-# (gym-pybullet-drones). Defaults: FULL (16-D) obs, point-mass physics.
-_VARIANTS: dict[str, dict[str, Any]] = {
-    "Hover-v0": {},
-    "Hover6DOF-v0": {"physics_model": "six_dof"},
-    "HoverMinimal-v0": {"observation_type": "minimal"},
-    "HoverThrustOnly-v0": {"action_type": "thrust_only"},
+# Registered task variants: (entry_point, max_episode_steps, kwargs). Many small
+# registered variants over a few task classes mirrors MiniGrid; selecting
+# behaviour via registry kwargs mirrors gym-pybullet-drones. Episode caps follow
+# each task's time limit at dt=0.02 (500 = 10 s, 600 = 12 s). Defaults: FULL
+# (16-D) obs, ATTITUDE action, point-mass physics.
+_VARIANTS: dict[str, tuple[str, int, dict[str, Any]]] = {
+    # Hover family
+    "Hover-v0": (_HOVER, 500, {}),
+    "Hover6DOF-v0": (_HOVER, 500, {"physics_model": "six_dof"}),
+    "HoverMinimal-v0": (_HOVER, 500, {"observation_type": "minimal"}),
+    "HoverThrustOnly-v0": (_HOVER, 500, {"action_type": "thrust_only"}),
+    # Waypoint family (Phase 4)
+    "Waypoint-v0": (_WAYPOINT, 500, {}),
+    "Waypoint6DOF-v0": (_WAYPOINT, 500, {"physics_model": "six_dof"}),
+    # Trajectory family (Phase 4)
+    "Trajectory-v0": (_TRAJECTORY, 600, {}),
+    "Trajectory6DOF-v0": (_TRAJECTORY, 600, {"physics_model": "six_dof"}),
 }
 
-for _env_id, _kwargs in _VARIANTS.items():
+for _env_id, (_entry, _max_steps, _kwargs) in _VARIANTS.items():
     if _env_id not in gym.registry:
         register(
             id=_env_id,
-            entry_point=_ENTRY_POINT,
-            max_episode_steps=_MAX_EPISODE_STEPS,
+            entry_point=_entry,
+            max_episode_steps=_max_steps,
             kwargs=_kwargs,
         )
 

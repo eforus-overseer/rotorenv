@@ -20,6 +20,7 @@ from rotorenv.core.reward import RewardTerm
 from rotorenv.core.state import DroneState
 from rotorenv.physics.base_physics import DronePhysics
 from rotorenv.physics.point_mass import PointMassPhysics
+from rotorenv.physics.six_dof import SixDOFPhysics
 
 # Observation layout (13,): position(3) velocity(3) orientation(3) distance(3) time(1).
 OBS_DIM = 13
@@ -43,16 +44,24 @@ class DroneEnv(gym.Env):
     def __init__(
         self,
         physics: Optional[DronePhysics] = None,
+        physics_model: str = "point_mass",
         render_mode: Optional[str] = None,
     ) -> None:
         """Initialise spaces, physics backend, and reward function.
 
         Args:
-            physics: Dynamics backend; defaults to :class:`PointMassPhysics`.
+            physics: Explicit dynamics backend instance. If given, it takes
+                precedence over ``physics_model``.
+            physics_model: Name of a built-in backend to construct when
+                ``physics`` is not supplied. One of ``"point_mass"`` (Phase 1)
+                or ``"six_dof"`` (Phase 2). Strings are used so the backend is
+                selectable through the Gymnasium registry.
             render_mode: Optional Gymnasium render mode (``"human"``).
         """
         super().__init__()
-        self.physics: DronePhysics = physics if physics is not None else PointMassPhysics()
+        self.physics: DronePhysics = (
+            physics if physics is not None else self._make_physics(physics_model)
+        )
         self.render_mode = render_mode
 
         self.action_space = spaces.Box(-1.0, 1.0, shape=(ACT_DIM,), dtype=np.float32)
@@ -64,6 +73,27 @@ class DroneEnv(gym.Env):
         self.state: Optional[DroneState] = None
         self.target: np.ndarray = self._make_target()
         self._renderer: Any = None
+
+    @staticmethod
+    def _make_physics(physics_model: str) -> DronePhysics:
+        """Construct a built-in physics backend by name.
+
+        Args:
+            physics_model: ``"point_mass"`` or ``"six_dof"``.
+
+        Returns:
+            A fresh physics backend instance.
+
+        Raises:
+            ValueError: If ``physics_model`` is not a known backend name.
+        """
+        backends = {"point_mass": PointMassPhysics, "six_dof": SixDOFPhysics}
+        if physics_model not in backends:
+            raise ValueError(
+                f"Unknown physics_model {physics_model!r}; "
+                f"expected one of {sorted(backends)}."
+            )
+        return backends[physics_model]()
 
     # ------------------------------------------------------------------ #
     # Task hooks — subclasses implement these.                            #
@@ -133,6 +163,8 @@ class DroneEnv(gym.Env):
         super().reset(seed=seed)
         self.target = self._make_target()
         self.state = self._initial_state()
+        if self._renderer is not None:
+            self._renderer.reset()
         return self._get_obs(self.state), self._get_info(self.state)
 
     def step(

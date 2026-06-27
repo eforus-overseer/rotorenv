@@ -22,6 +22,14 @@ if "Hover-v0" not in gym.registry:
         max_episode_steps=500,  # 10 s at dt=0.02
     )
 
+if "Hover6DOF-v0" not in gym.registry:
+    register(
+        id="Hover6DOF-v0",
+        entry_point="rotorenv.envs.hover_env:HoverEnv",
+        max_episode_steps=500,  # 10 s at dt=0.02
+        kwargs={"physics_model": "six_dof"},
+    )
+
 
 def make(env_id: str, **kwargs: Any) -> gym.Env:
     """Create a registered rotorenv environment.

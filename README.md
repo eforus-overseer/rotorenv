@@ -4,12 +4,21 @@ A lightweight, [Gymnasium](https://gymnasium.farama.org/)-compatible reinforceme
 learning environment for training autonomous drone (quadrotor) agents. Pure
 Python, physics-first, and designed to be extended incrementally.
 
-## Status — Phase 1
+## Status
 
+**Phase 1 (complete)**
 - Point-mass physics (no drag, no rotor lag, no inertia matrix)
 - `Hover-v0`: hold position at `(0, 0, 1.0)`
-- Matplotlib 3D rendering
 - No ML framework dependency — environment only
+
+**Phase 2 (complete)**
+- Full 6-DOF rigid-body physics: diagonal inertia tensor, body torques,
+  quaternion attitude integration, linear + angular drag
+- `Hover6DOF-v0`: same hover task on the 6-DOF backend
+- Upgraded 3D renderer: a quadrotor cross that **tilts with true attitude**,
+  body-up axis, and a fading trajectory trail
+- The action contract is unchanged (`[thrust, roll, pitch, yaw]`), so Phase-1
+  policies run on Phase-2 physics without modification
 
 ## Install
 
@@ -43,6 +52,12 @@ Run the random-agent sanity check:
 python examples/random_agent.py
 ```
 
+Watch a 6-DOF episode in the live 3D window (tilting quad + trajectory trail):
+
+```bash
+python examples/render_6dof.py
+```
+
 Run the tests:
 
 ```bash
@@ -56,18 +71,27 @@ concerns:
 
 ```
 rotorenv/
-├── core/        DroneState, DroneAction, composable reward terms
-├── physics/     DronePhysics protocol + PointMassPhysics (swap-in point)
+├── core/        DroneState, DroneAction, reward terms, rotation utils
+├── physics/     DronePhysics protocol + PointMassPhysics + SixDOFPhysics
 ├── envs/        DroneEnv base (Gym plumbing) + HoverEnv task
 └── rendering/   Matplotlib 3D renderer (lazy-imported)
 ```
 
-- **Physics is a `Protocol`.** A Phase-2 6-DOF model only needs a matching
-  `step()`; the environment never imports a concrete physics class directly.
+- **Physics is a `Protocol`.** `SixDOFPhysics` (Phase 2) was added purely by
+  matching `step(state, action) -> DroneState`; the environment imports no
+  concrete physics class. Select a backend via `physics_model="point_mass"`
+  (default) or `"six_dof"`, or pass your own instance.
 - **Reward is data.** A task's shaping is a list of `RewardTerm` objects summed
   by `CompositeReward`, not a hard-coded function.
 - **Tasks subclass `DroneEnv`.** A task supplies the initial state, target,
   reward, and termination rule — never the step loop.
+
+### Registered environments
+
+| ID | Physics | Notes |
+|----|---------|-------|
+| `Hover-v0` | `PointMassPhysics` | Phase 1; thrust tilts with orientation |
+| `Hover6DOF-v0` | `SixDOFPhysics` | Phase 2; full rigid-body, quaternion attitude |
 
 ### Domain model
 

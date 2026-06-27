@@ -8,8 +8,10 @@ Guidance for Claude Code (and humans) working in this repository.
 reinforcement learning environment for training autonomous quadrotor agents. Pure
 Python, physics-first, built to be extended incrementally in phases.
 
-**Current phase: Phase 1** — point-mass physics, a single `Hover-v0` task, no ML
-framework dependency. The environment is the product; policies come later.
+**Current phase: Phase 2 (complete)** — full 6-DOF rigid-body physics alongside
+the Phase-1 point mass. Two registered tasks (`Hover-v0` → point mass,
+`Hover6DOF-v0` → 6-DOF), no ML framework dependency. The environment is the
+product; policies come later.
 
 ## Environment setup (read before installing)
 
@@ -28,8 +30,9 @@ Run things with the venv interpreter (`.venv/bin/python`) if the env isn't activ
 
 ```bash
 python examples/random_agent.py    # sanity check: 3 random episodes, prints return
-pytest                             # full test suite (currently 20 tests)
-pytest tests/test_physics.py -q    # one module
+python examples/render_6dof.py     # live 3D window: tilting quad + trajectory trail
+pytest                             # full test suite (currently 38 tests)
+pytest tests/test_six_dof.py -q    # one module
 ```
 
 ## Architecture — keep these concerns separate
@@ -39,16 +42,22 @@ them into the env loop.
 
 ```
 rotorenv/
-├── core/        DroneState, DroneAction, composable reward terms
-├── physics/     DronePhysics Protocol + PointMassPhysics (the swap-in point)
+├── core/        DroneState, DroneAction, reward terms, rotations.py (frame utils)
+├── physics/     DronePhysics Protocol + PointMassPhysics + SixDOFPhysics
 ├── envs/        DroneEnv base (all Gym plumbing) + HoverEnv task
-└── rendering/   Matplotlib 3D renderer (lazy-imported)
+└── rendering/   Matplotlib 3D renderer (lazy-imported, attitude-aware)
 ```
 
 - **Physics is a `typing.Protocol`** (`physics/base_physics.py`). A new backend
-  (e.g. Phase-2 6-DOF) only needs a matching `step(state, action) -> DroneState`
-  and a `dt` attribute. The env depends on the *shape*, never on a concrete class
-  — do not make backends inherit from a base class.
+  only needs a matching `step(state, action) -> DroneState` and a `dt` attribute.
+  The env depends on the *shape*, never on a concrete class — do not make
+  backends inherit from a base class. `SixDOFPhysics` (Phase 2) was added this
+  way with zero changes to `DroneEnv`/`HoverEnv`. Select via `physics_model`
+  (`"point_mass"` | `"six_dof"`) or pass an explicit `physics=` instance.
+- **One frame convention, in `core/rotations.py`.** ZYX Euler, scalar-first
+  quaternions `[w,x,y,z]`. All backends and the renderer use it — do not inline
+  ad-hoc rotation maths. 6-DOF integrates attitude as a quaternion internally and
+  converts to Euler only at the `DroneState` boundary (the fixed contract).
 - **Reward is data, not code.** A task's shaping is a list of `RewardTerm`
   objects summed by `CompositeReward` (`core/reward.py`). Add behaviour by adding
   a term, not by editing a monolithic reward function.
@@ -65,7 +74,8 @@ rotorenv/
   Never call the global `np.random.seed()` or top-level `np.random.*`.
 - Physics `step()` must be pure: return a new `DroneState`, never mutate the input.
 - Use `gymnasium`, never legacy `gym`.
-- No physics-engine dependency in Phase 1 (no PyBullet / MuJoCo).
+- No external physics-engine dependency (no PyBullet / MuJoCo); 6-DOF is
+  hand-rolled numpy integration.
 - matplotlib is imported lazily inside the renderer — keep `import rotorenv` and
   headless training free of a hard matplotlib-at-import cost.
 

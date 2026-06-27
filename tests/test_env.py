@@ -88,3 +88,32 @@ def test_gymnasium_make_also_works() -> None:
     env = gym.make("Hover-v0")
     env.reset(seed=1)
     env.close()
+
+
+def test_six_dof_variant_registered_and_uses_six_dof() -> None:
+    """Hover6DOF-v0 is registered and runs on the SixDOFPhysics backend."""
+    from rotorenv.physics.six_dof import SixDOFPhysics
+
+    env = rotorenv.make("Hover6DOF-v0")
+    inner = env.unwrapped
+    assert isinstance(inner.physics, SixDOFPhysics)
+    obs, _info = env.reset(seed=0)
+    assert inner.observation_space.contains(obs)
+    env.step(np.zeros(4, dtype=np.float32))
+    env.close()
+
+
+def test_default_env_uses_point_mass() -> None:
+    """The default Hover-v0 still uses the Phase-1 point-mass backend."""
+    from rotorenv.physics.point_mass import PointMassPhysics
+
+    env = HoverEnv()
+    assert isinstance(env.physics, PointMassPhysics)
+
+
+def test_unknown_physics_model_raises() -> None:
+    """An unknown physics_model name is rejected with a clear error."""
+    import pytest
+
+    with pytest.raises(ValueError, match="Unknown physics_model"):
+        HoverEnv(physics_model="warp_drive")

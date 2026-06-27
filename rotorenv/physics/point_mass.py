@@ -15,34 +15,10 @@ from dataclasses import dataclass
 import numpy as np
 
 from rotorenv.core.action import DroneAction
+from rotorenv.core.rotations import euler_to_rotmat
 from rotorenv.core.state import DroneState
 
 _Z_HAT = np.array([0.0, 0.0, 1.0], dtype=np.float64)
-
-
-def _body_to_world(orientation: np.ndarray) -> np.ndarray:
-    """Return the ZYX (yaw, pitch, roll) body-to-world rotation matrix.
-
-    Args:
-        orientation: Euler angles ``(roll, pitch, yaw)`` in radians.
-
-    Returns:
-        A ``(3, 3)`` rotation matrix mapping body-frame vectors to world frame.
-    """
-    roll, pitch, yaw = (float(orientation[0]), float(orientation[1]), float(orientation[2]))
-    cr, sr = np.cos(roll), np.sin(roll)
-    cp, sp = np.cos(pitch), np.sin(pitch)
-    cy, sy = np.cos(yaw), np.sin(yaw)
-
-    # R = Rz(yaw) @ Ry(pitch) @ Rx(roll)
-    return np.array(
-        [
-            [cy * cp, cy * sp * sr - sy * cr, cy * sp * cr + sy * sr],
-            [sy * cp, sy * sp * sr + cy * cr, sy * sp * cr - cy * sr],
-            [-sp, cp * sr, cp * cr],
-        ],
-        dtype=np.float64,
-    )
 
 
 @dataclass
@@ -96,7 +72,7 @@ class PointMassPhysics:
 
         # --- Translational update: F = thrust(world) - m*g*z_hat ---
         thrust_force = action.thrust * self.max_thrust
-        up_world = _body_to_world(orientation) @ _Z_HAT
+        up_world = euler_to_rotmat(orientation) @ _Z_HAT
         f_net = thrust_force * up_world - self.mass * self.gravity * _Z_HAT
         acceleration = f_net / self.mass
 

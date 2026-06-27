@@ -32,16 +32,29 @@ SPAWN_ORIENTATION_NOISE = 0.1  # radians, uniform +/- per axis
 class HoverEnv(DroneEnv):
     """Single-target hover task built on :class:`DroneEnv`.
 
-    The drone spawns at the origin with zero velocity and a small random
-    orientation perturbation, and is rewarded for holding the target point.
+    The drone spawns with zero velocity and a small random orientation
+    perturbation, and is rewarded for holding the target point ``(0, 0, 1.0)``.
+
+    Args:
+        spawn_height: Initial ``z`` (metres). Default ``0.0`` spawns on the
+            ground (the agent must learn takeoff — hard for a cold-start
+            learner). Set near the target height (e.g. ``1.0``) for a pure
+            attitude-stabilised hover that is far more trainable, as reference
+            drone-RL envs do.
+        **kwargs: Forwarded to :class:`DroneEnv` (physics, spaces, render mode).
     """
+
+    def __init__(self, spawn_height: float = 0.0, **kwargs) -> None:
+        """Store the spawn height, then initialise the base env."""
+        self.spawn_height = float(spawn_height)
+        super().__init__(**kwargs)
 
     def _make_target(self) -> np.ndarray:
         """Return the fixed hover target ``(0, 0, 1.0)``."""
         return TARGET_POSITION.copy()
 
     def _initial_state(self) -> DroneState:
-        """Spawn at the origin with zero velocity and noisy orientation.
+        """Spawn at ``(0, 0, spawn_height)`` with zero velocity, noisy attitude.
 
         Orientation noise is drawn from ``self.np_random`` (seeded via
         ``reset(seed=...)``), so episodes are reproducible.
@@ -50,7 +63,7 @@ class HoverEnv(DroneEnv):
             -SPAWN_ORIENTATION_NOISE, SPAWN_ORIENTATION_NOISE, size=3
         )
         return DroneState(
-            position=np.zeros(3),
+            position=np.array([0.0, 0.0, self.spawn_height], dtype=np.float64),
             velocity=np.zeros(3),
             orientation=orientation,
             angular_velocity=np.zeros(3),

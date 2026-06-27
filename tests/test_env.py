@@ -133,6 +133,32 @@ def test_default_env_uses_point_mass() -> None:
     assert isinstance(env.physics, PointMassPhysics)
 
 
+def test_default_spawn_height_is_ground() -> None:
+    """Default spawn stays on the ground (z=0) — preserves prior behavior."""
+    env = HoverEnv()
+    obs, _info = env.reset(seed=0)
+    assert obs[2] == 0.0
+
+
+def test_spawn_height_lifts_drone_off_ground() -> None:
+    """spawn_height places the drone airborne at reset."""
+    env = HoverEnv(spawn_height=1.0)
+    obs, _info = env.reset(seed=0)
+    assert obs[2] == 1.0
+
+
+def test_hover_easy_variant_spawns_airborne() -> None:
+    """HoverEasy-v0 spawns at the target height on the 6-DOF backend."""
+    from rotorenv.physics.six_dof import SixDOFPhysics
+
+    env = rotorenv.make("HoverEasy-v0")
+    inner = env.unwrapped
+    assert isinstance(inner.physics, SixDOFPhysics)
+    obs, _info = env.reset(seed=0)
+    assert obs[2] == 1.0
+    env.close()
+
+
 def test_unknown_physics_model_raises() -> None:
     """An unknown physics_model name is rejected with a clear error."""
     import pytest

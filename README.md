@@ -76,6 +76,19 @@ Watch a 6-DOF episode in the live 3D window (tilting quad + trajectory trail):
 python examples/render_6dof.py
 ```
 
+Train a PPO policy (requires the optional `rl` extra) and watch it fly:
+
+```bash
+pip install -e ".[rl]"                                   # stable-baselines3
+python examples/train_ppo.py --env HoverEasy-v0 --steps 50000
+python examples/train_ppo.py --env HoverEasy-v0 --replay-only   # live 3D replay
+```
+
+This writes a learning curve to `runs/<env>/learning_curve.png` and prints an
+eval summary. `HoverEasy-v0` spawns the drone airborne (pure attitude-stabilised
+hover) — far more learnable from scratch than the ground-spawn tasks, which
+require learning takeoff.
+
 Run the tests:
 
 ```bash

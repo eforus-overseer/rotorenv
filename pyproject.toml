@@ -19,6 +19,11 @@ dependencies = [
 dev = [
     "pytest>=7.0",
 ]
+# Reinforcement-learning extras: NOT part of the core env, kept optional so
+# `import rotorenv` stays ML-framework-free. Install with `pip install -e ".[rl]"`.
+rl = [
+    "stable-baselines3>=2.3",
+]
 
 [tool.setuptools.packages.find]
 include = ["rotorenv*"]

@@ -8,11 +8,18 @@ Guidance for Claude Code (and humans) working in this repository.
 reinforcement learning environment for training autonomous quadrotor agents. Pure
 Python, physics-first, built to be extended incrementally in phases.
 
-**Current phase: Phase 4 (complete)** — tasks + curriculum learning. Three task
-families (hover, waypoint, trajectory) × physics/space variants = 8 registered
-envs, plus a `CurriculumWrapper` (success-based or step-annealed). Built on
-Phase 1 (point mass) + Phase 2 (6-DOF) + Phase 3 (enum spaces, check_env,
-wrappers). Still no ML framework dependency.
+**Current phase: Phase 5 (complete)** — PPO training pipeline. `examples/train_ppo.py`
+trains/evaluates/plots/replays a stable-baselines3 PPO policy; SB3 is an
+*optional* `[rl]` extra (core env stays ML-framework-free). Verified the env is
+learnable: eval reward climbs ~2.7→11.9 over 50k steps on `HoverEasy-v0`.
+Built on Phases 1–4 (point mass, 6-DOF, enum spaces/check_env/wrappers, tasks +
+curriculum).
+
+**Key training lesson:** ground-spawn tasks (z=0, crash at z<0) are nearly
+unlearnable from scratch — a cold policy crashes on step 1 (reward flat at
+-5.50). Train on airborne-spawn variants (`HoverEasy-v0`, spawn_height=1.0) for
+pure attitude-stabilised hover. `spawn_height` is a `HoverEnv` arg (default 0.0
+preserves the takeoff task and all prior tests).
 
 We deliberately mirror how established Gymnasium envs are built
 (`gym-pybullet-drones`, MiniGrid, quad-swarm-rl, QuadCtrl) rather than inventing
@@ -39,7 +46,8 @@ python examples/random_agent.py    # sanity check: 3 random episodes, prints ret
 python examples/render_6dof.py     # live 3D window: tilting quad + trajectory trail
 python examples/wrapped_agent.py   # wrappers + vectorized-env demo
 python examples/curriculum_demo.py # success-based curriculum on Waypoint-v0
-pytest                             # full test suite (currently 72 tests)
+python examples/train_ppo.py --env HoverEasy-v0 --steps 50000   # train PPO (needs .[rl])
+pytest                             # full test suite (currently 75 tests)
 pytest tests/test_conformance.py   # Gymnasium check_env across all variants
 ```
 

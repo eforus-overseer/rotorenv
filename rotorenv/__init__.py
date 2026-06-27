@@ -29,6 +29,9 @@ _VARIANTS: dict[str, tuple[str, int, dict[str, Any]]] = {
     "Hover6DOF-v0": (_HOVER, 500, {"physics_model": "six_dof"}),
     "HoverMinimal-v0": (_HOVER, 500, {"observation_type": "minimal"}),
     "HoverThrustOnly-v0": (_HOVER, 500, {"action_type": "thrust_only"}),
+    # Airborne-spawn hover: starts at target height, so the task is pure
+    # attitude-stabilised hovering (no takeoff). Far more learnable from scratch.
+    "HoverEasy-v0": (_HOVER, 500, {"physics_model": "six_dof", "spawn_height": 1.0}),
     # Waypoint family (Phase 4)
     "Waypoint-v0": (_WAYPOINT, 500, {}),
     "Waypoint6DOF-v0": (_WAYPOINT, 500, {"physics_model": "six_dof"}),

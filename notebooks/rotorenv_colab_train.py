@@ -21,28 +21,17 @@
 # ## 1. Setup — clone, install, headless display
 
 # %%
-# System deps for headless off-screen rendering (PyVista/VTK needs a display).
-!apt-get -qq update && apt-get -qq install -y xvfb libgl1-mesa-glx > /dev/null
-!pip -q install pyvirtualdisplay
+# System libs for off-screen GL + a virtual X display (depth rendering needs both).
+!apt-get -qq update && apt-get -qq install -y xvfb libgl1-mesa-glx > /dev/null 2>&1
 # Clone the repo and install with the RL + render extras.
 ![ -d rotorenv ] || git clone https://github.com/eforus-overseer/rotorenv.git
 %cd rotorenv
 !git pull --quiet
-!pip -q install -e ".[rl,render]"
-print('\ninstall done')
+# `set -e` so a failed install aborts the cell loudly instead of silently
+# leaving training to crash later (which looks like "no model saved").
+!set -e && pip -q install -e ".[rl,render]" && echo "INSTALL OK"
 
 # %%
-# Start a virtual framebuffer so PyVista can render off-screen on headless Colab.
-import os
-from pyvirtualdisplay import Display
-_display = Display(visible=0, size=(1024, 768))
-_display.start()
-os.environ['PYVISTA_OFF_SCREEN'] = 'true'
-os.environ['DISPLAY'] = f':{_display.display}'
-
-import pyvista as pv
-pv.OFF_SCREEN = True
-
 # Confirm the GPU is visible to PyTorch (the whole point of using Colab).
 import torch
 print('torch', torch.__version__, '| CUDA available:', torch.cuda.is_available())
@@ -50,6 +39,10 @@ if torch.cuda.is_available():
     print('GPU:', torch.cuda.get_device_name(0))
 else:
     print('WARNING: no GPU — set Runtime > Change runtime type > T4 GPU')
+
+# Sanity-check the rotorenv install (catches a failed pip install before training).
+import rotorenv, gymnasium
+print('rotorenv import OK | gymnasium', gymnasium.__version__)
 
 # %% [markdown]
 # ## 2. Sanity check — state-perception navigation (fast)
@@ -70,6 +63,32 @@ else:
 #
 # The script checkpoints the model every 10k steps, so a disconnect won't lose progress.
 # Run the cell to completion (or until curriculum difficulty climbs) before rendering below.
+#
+# **Headless rendering setup** (run the next cell ONCE before vision training):
+# depth perception renders off-screen via PyVista/VTK, which needs a virtual X
+# display. We launch Xvfb on :99 and export DISPLAY so the `!python` training
+# subprocess below inherits it. The smoke-test then fails fast here if rendering
+# is broken, instead of crashing 10 minutes into training.
+
+# %%
+import os, subprocess, time
+# Launch a virtual framebuffer (idempotent: ignore if already running).
+subprocess.Popen(['Xvfb', ':99', '-screen', '0', '1024x768x24'],
+                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+time.sleep(3)
+os.environ['DISPLAY'] = ':99'
+os.environ['PYVISTA_OFF_SCREEN'] = 'true'
+import pyvista as pv
+pv.OFF_SCREEN = True
+
+# Smoke-test off-screen depth rendering BEFORE the long training run.
+import numpy as np
+from rotorenv.rendering.depth_camera import DepthCamera
+from rotorenv.core.state import DroneState
+_cam = DepthCamera(np.zeros((0, 6)), height=32, width=32)
+_img = _cam.capture(DroneState(np.array([0., 0, 1.5]), np.zeros(3), np.zeros(3), np.zeros(3), 0.))
+_cam.close()
+print('off-screen depth render OK, frame', _img.shape, '| DISPLAY =', os.environ.get('DISPLAY'))
 
 # %%
 !python examples/train_nav_curriculum.py --env NavigationDepth-v0 --steps 300000 --seed 0

@@ -48,6 +48,20 @@ def test_depth_registered_variant() -> None:
     env.close()
 
 
+def test_depth_camera_survives_sustained_reuse() -> None:
+    """Many consecutive captures must not raise (regression: get_image_depth
+    needs store_image_depth=True or it fails after re-renders during training)."""
+    env = NavigationEnv(perception="depth")
+    env.reset(seed=0, options={"difficulty": 0.5})
+    a = np.array([0.5, 0.0, 0.0, 0.0], dtype=np.float32)
+    for _ in range(60):
+        obs, _r, term, trunc, _i = env.step(a)
+        assert np.isfinite(obs).all()
+        if term or trunc:
+            env.reset(seed=1, options={"difficulty": 0.5})
+    env.close()
+
+
 def test_depth_responds_to_geometry() -> None:
     """A near obstacle yields smaller (nearer) depth values than open sky."""
     env = NavigationEnv(perception="depth")

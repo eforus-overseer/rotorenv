@@ -30,9 +30,27 @@ def main() -> None:
     args = parser.parse_args()
 
     from stable_baselines3 import PPO
+    from stable_baselines3.common.callbacks import BaseCallback
     from stable_baselines3.common.monitor import Monitor
     from stable_baselines3.common.vec_env import DummyVecEnv
     from rotorenv.envs.curriculum import CurriculumWrapper
+
+    class ProgressLogger(BaseCallback):
+        """Print timesteps + live curriculum difficulty every ``every`` steps.
+
+        Without this, ``verbose=0`` training is a silent black box for minutes;
+        this surfaces that the curriculum is actually advancing.
+        """
+
+        def __init__(self, every: int = 10_000) -> None:
+            super().__init__()
+            self.every = every
+
+        def _on_step(self) -> bool:
+            if self.num_timesteps % self.every < self.training_env.num_envs:
+                diff = self.training_env.envs[0].env.difficulty
+                print(f"  [{self.num_timesteps:>7,} steps]  curriculum difficulty = {diff:.2f}")
+            return True
 
     out_dir = os.path.join("runs", f"{args.env}_curriculum")
     os.makedirs(out_dir, exist_ok=True)
@@ -61,7 +79,7 @@ def main() -> None:
     model = PPO(policy, train_env, seed=args.seed, policy_kwargs=policy_kwargs, verbose=0)
     print(f"Training PPO ({policy}) on {args.env} with success-based curriculum "
           f"for {args.steps:,} steps...")
-    model.learn(total_timesteps=args.steps)
+    model.learn(total_timesteps=args.steps, callback=ProgressLogger(every=10_000))
 
     final_difficulty = train_env.envs[0].env.difficulty
     print(f"\nFinal curriculum difficulty reached: {final_difficulty:.2f} (0=empty, 1=max)")

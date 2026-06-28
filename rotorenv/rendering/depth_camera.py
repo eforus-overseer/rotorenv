@@ -65,8 +65,10 @@ class DepthCamera:
                 color="white",
             )
         self.plotter.camera.view_angle = float(fov_deg)
-        # Prime the render pipeline so get_image_depth() is available.
-        self.plotter.show(auto_close=False)
+        # Prime the render pipeline with depth-buffer storage enabled so every
+        # subsequent get_image_depth() works (otherwise the buffer is discarded
+        # after each render and get_image_depth raises on reuse).
+        self.plotter.show(auto_close=False, store_image_depth=True)
 
     def capture(self, state: DroneState) -> np.ndarray:
         """Return the normalised depth image from the drone's POV.

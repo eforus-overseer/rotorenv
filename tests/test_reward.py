@@ -12,6 +12,7 @@ from rotorenv.core.reward import (
     DistancePenalty,
     EnergyPenalty,
     HoverZoneBonus,
+    ProgressReward,
 )
 from rotorenv.core.state import DroneState
 
@@ -61,6 +62,34 @@ def test_crash_penalty_only_on_crash() -> None:
     term = CrashPenalty(penalty=5.0)
     assert term(_state_at(TARGET), _noop_action(), TARGET, crashed=True) == -5.0
     assert term(_state_at(TARGET), _noop_action(), TARGET, crashed=False) == 0.0
+
+
+def test_progress_reward_rewards_approach_punishes_retreat() -> None:
+    """ProgressReward pays scale*(d_prev - d_curr): + on approach, - on retreat."""
+    term = ProgressReward(scale=1.0)
+    term.reset(np.array([0.0, 0.0, 0.0]), TARGET)  # spawn d_prev = 1.0
+    # Move 0.3 m closer (z=0.3, target z=1.0 -> dist=0.7).
+    approach = _state_at(np.array([0.0, 0.0, 0.3]))
+    assert term(approach, _noop_action(), TARGET, crashed=False) == pytest.approx(0.3)
+    # Retreat 0.5 m (z=-0.2 -> dist=1.2 from current d_prev=0.7).
+    retreat = _state_at(np.array([0.0, 0.0, -0.2]))
+    assert term(retreat, _noop_action(), TARGET, crashed=False) == pytest.approx(-0.5)
+
+
+def test_progress_reward_zero_at_first_call_without_reset() -> None:
+    """First call without reset() returns 0 (no prior baseline to compare)."""
+    term = ProgressReward(scale=1.0)
+    state = _state_at(np.array([0.0, 0.0, 0.0]))
+    assert term(state, _noop_action(), TARGET, crashed=False) == 0.0
+
+
+def test_progress_reward_reset_seeds_distance() -> None:
+    """reset() seeds the prev distance so the first step measures real movement."""
+    term = ProgressReward(scale=2.0)
+    term.reset(np.array([0.0, 0.0, 0.0]), TARGET)
+    # Move to target -> 1 m of progress, scaled by 2.
+    arrived = _state_at(TARGET)
+    assert term(arrived, _noop_action(), TARGET, crashed=False) == pytest.approx(2.0)
 
 
 def test_composite_sums_terms() -> None:

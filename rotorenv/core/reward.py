@@ -77,6 +77,39 @@ class EnergyPenalty:
 
 
 @dataclass
+class ProgressReward:
+    """Reward for closing distance to the target each step.
+
+    Provides a **dense, locally-pointing signal** even when the goal is far —
+    standard for goal-reaching robotics RL. ``r = scale * (d_prev - d_curr)``,
+    so moving 1 m closer pays ``scale``, stalling pays 0, retreating pays
+    negative. The previous distance is held in instance state and **must** be
+    cleared at the start of every episode via :meth:`reset`; tasks that use
+    this term should call ``reset(initial_position, target)`` from their env
+    reset path.
+    """
+
+    scale: float = 1.0
+    _prev_distance: float | None = None
+
+    def reset(self, initial_position: np.ndarray, target: np.ndarray) -> None:
+        """Seed the "previous distance" with the spawn distance (zero progress)."""
+        self._prev_distance = float(np.linalg.norm(target - initial_position))
+
+    def __call__(
+        self, state: DroneState, action: DroneAction, target: np.ndarray, *, crashed: bool
+    ) -> float:
+        """Return ``scale * (prev_distance - current_distance)``; 0 if not seeded."""
+        distance = float(np.linalg.norm(target - state.position))
+        if self._prev_distance is None:
+            self._prev_distance = distance
+            return 0.0
+        progress = self._prev_distance - distance
+        self._prev_distance = distance
+        return float(self.scale) * progress
+
+
+@dataclass
 class CrashPenalty:
     """One-off penalty applied on the terminal crash step."""
 

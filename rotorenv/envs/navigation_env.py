@@ -30,6 +30,7 @@ from rotorenv.core.reward import (
     DistancePenalty,
     EnergyPenalty,
     HoverZoneBonus,
+    ProgressReward,
     RewardTerm,
 )
 from rotorenv.core.state import DroneState
@@ -170,6 +171,10 @@ class NavigationEnv(DroneEnv):
         orientation = self.np_random.uniform(
             -SPAWN_ORIENTATION_NOISE, SPAWN_ORIENTATION_NOISE, size=3
         )
+        # Seed ProgressReward with the spawn distance so the first step's
+        # progress measures real movement (not the spawn drop-in).
+        if getattr(self, "_progress_term", None) is not None:
+            self._progress_term.reset(START_POSITION, self.target)
         return DroneState(
             position=START_POSITION.copy(),
             velocity=np.zeros(3),
@@ -179,11 +184,20 @@ class NavigationEnv(DroneEnv):
         )
 
     def _build_reward(self) -> RewardTerm:
-        """Reward: big bonus at the goal, distance shaping, energy + collision."""
+        """Reward: dense progress shaping + goal bonus + light penalties.
+
+        ``ProgressReward`` is the dense signal that makes the long start->goal
+        navigation learnable from sparse rewards alone: each step pays the
+        *change in distance to goal*, so moving forward is rewarded immediately.
+        Replaces the prior absolute :class:`DistancePenalty` (which the agent
+        could only mitigate by reaching the goal — too sparse for a CNN policy
+        on this budget).
+        """
+        self._progress_term = ProgressReward(scale=1.0)
         return CompositeReward(
             terms=[
-                HoverZoneBonus(radius=GOAL_RADIUS, bonus=10.0),
-                DistancePenalty(weight=0.2),
+                self._progress_term,
+                HoverZoneBonus(radius=GOAL_RADIUS, bonus=20.0),
                 EnergyPenalty(weight=0.01),
                 CrashPenalty(penalty=10.0),
             ]

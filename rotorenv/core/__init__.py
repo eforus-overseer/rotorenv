@@ -13,6 +13,7 @@ from rotorenv.core.reward import (
     DistancePenalty,
     EnergyPenalty,
     HoverZoneBonus,
+    ProgressReward,
     RewardTerm,
 )
 from rotorenv.core.state import DroneState
@@ -29,5 +30,6 @@ __all__ = [
     "DistancePenalty",
     "HoverZoneBonus",
     "EnergyPenalty",
+    "ProgressReward",
     "CrashPenalty",
 ]

@@ -8,16 +8,23 @@ Guidance for Claude Code (and humans) working in this repository.
 reinforcement learning environment for training autonomous quadrotor agents. Pure
 Python, physics-first, built to be extended incrementally in phases.
 
-**Current phase: Phase 6 (complete)** — "MiniGrid in 3D" procedural navigation
-with PEDRA-style vision perception. `NavigationEnv`: random pillar field, fly
-start→goal without colliding, obstacle count scales with curriculum difficulty.
-Two perception modes: `"state"` (kinematic vector, ~22k steps/s) and `"depth"`
-(onboard 64×64 depth camera via PyVista, ~490 steps/s — channel-first `(1,H,W)`,
-pre-normalised so PPO needs `policy_kwargs={"normalize_images": False}` +
-`CnnPolicy`). Registered: `Navigation-v0`, `Navigation6DOF-v0`,
-`NavigationDepth-v0`. Pipeline validated (CNN-PPO reward −181→−59 over 15k steps
-= learns obstacle avoidance, NOT goal-reaching; vision-nav needs millions of
-steps / GPU). See [[rotorenv-vision-3d-navigation]].
+**Current phase: Phase 6 (complete)** — "MiniGrid in 3D" procedural navigation,
+vision perception, and curriculum-driven training. `NavigationEnv`: random
+pillar field, fly start→goal without colliding, obstacle count scales with
+`self.difficulty`. Perception modes: `"state"` (~22k steps/s) and `"depth"`
+(64×64 PyVista depth, ~490 steps/s — channel-first `(1,H,W)`, needs
+`policy_kwargs={"normalize_images": False}` + `CnnPolicy`).
+
+**Key training lesson — replicate this pattern for new nav tasks:** direct
+training at max difficulty stalls (0/10 success). The unlock is
+(a) `ProgressReward(scale=1.0)` for dense step-wise shaping (replaces the
+absolute `DistancePenalty` which was too sparse), and (b) the Phase-4
+`CurriculumWrapper(mode="success", start_difficulty=0.0)` which begins in an
+empty arena and advances obstacle density on a recent-success rate. With both,
+200k MLP-PPO steps on `Navigation6DOF-v0` reach difficulty 0.6 with **80%
+success in empty arenas, 55% at d=0.5**. See `examples/train_nav_curriculum.py`.
+Registered: `Navigation-v0`, `Navigation6DOF-v0`, `NavigationDepth-v0`. See
+[[rotorenv-vision-3d-navigation]].
 
 Phase 5 — PPO training pipeline. `examples/train_ppo.py` trains/eval/plots/
 replays SB3 PPO; SB3 is the optional `[rl]` extra. Env verified learnable

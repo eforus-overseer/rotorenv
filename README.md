@@ -23,9 +23,13 @@ holds the translucent target, gold line is its flight trail.
 drone must fly start → goal without colliding. Obstacle count scales with
 curriculum difficulty.
 
-![navigation](docs/media/navigation_orbit.gif)
+![trained navigation](docs/media/navigation_trained.gif)
 
-> Flown here by a *scripted* controller just to show the procedural layout.
+> Trained PPO policy with success-based curriculum (`examples/train_nav_curriculum.py`,
+> 200k steps): starts in an empty arena, curriculum auto-advances obstacle
+> density once each level is mastered, ends at ~60% difficulty. **Eval success:
+> 16/20 at d=0, 13/20 at d=0.25, 11/20 at d=0.5.** The GIF shows one successful
+> run: drone bends through the pillar field and reaches the goal (final 0.43 m).
 
 ### Vision-based perception (PEDRA-style)
 

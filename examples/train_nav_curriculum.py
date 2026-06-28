@@ -84,7 +84,9 @@ def main() -> None:
     model = PPO(policy, train_env, seed=args.seed, policy_kwargs=policy_kwargs, verbose=0)
     print(f"Training PPO ({policy}) on {args.env} with success-based curriculum "
           f"for {args.steps:,} steps...")
-    ckpt_path = os.path.join(out_dir, "model.zip")
+    # SB3 appends ".zip" on save/load, so pass an extension-less path (avoids the
+    # confusing model.zip.zip that PPO.load reports when the file is missing).
+    ckpt_path = os.path.join(out_dir, "model")
     model.learn(
         total_timesteps=args.steps,
         callback=ProgressLogger(every=10_000, save_path=ckpt_path),
@@ -92,7 +94,7 @@ def main() -> None:
 
     final_difficulty = train_env.envs[0].env.difficulty
     print(f"\nFinal curriculum difficulty reached: {final_difficulty:.2f} (0=empty, 1=max)")
-    model.save(os.path.join(out_dir, "model.zip"))
+    model.save(ckpt_path)
 
     eval_difficulties = sorted({0.0, 0.25, 0.5, round(max(0.0, final_difficulty), 2)})
     print("\n=== Eval @ multiple difficulties (20 episodes each) ===")

@@ -68,7 +68,8 @@ else:
 # learns with a CNN. This is the compute-heavy run the GPU is for. Start with
 # ~300k steps; increase if the curriculum difficulty is still climbing at the end.
 #
-# The script checkpoints `model.zip` every 10k steps, so a disconnect won't lose progress.
+# The script checkpoints the model every 10k steps, so a disconnect won't lose progress.
+# Run the cell to completion (or until curriculum difficulty climbs) before rendering below.
 
 # %%
 !python examples/train_nav_curriculum.py --env NavigationDepth-v0 --steps 300000 --seed 0
@@ -77,14 +78,24 @@ else:
 # ## 4. Render the trained policy flying the obstacle field
 
 # %%
-import numpy as np, rotorenv
+import os, glob, numpy as np, rotorenv
 from stable_baselines3 import PPO
 from rotorenv.rendering.pyvista_renderer import PyVistaRenderer
 import imageio.v2 as imageio
 from IPython.display import Image as IPyImage, display
 
-ENV_ID = 'NavigationDepth-v0'          # or 'Navigation6DOF-v0' for the state policy
-model = PPO.load(f'runs/{ENV_ID}_curriculum/model.zip')
+# Auto-detect which policy was actually trained (vision preferred, else state).
+# SB3 saves/loads extension-less, so a model.zip on disk loads as 'model'.
+_candidates = ['NavigationDepth-v0', 'Navigation6DOF-v0']
+_found = [e for e in _candidates if os.path.exists(f'runs/{e}_curriculum/model.zip')]
+if not _found:
+    raise FileNotFoundError(
+        'No trained model found. Run the training cell(s) above first. '
+        f'Looked in: {[f"runs/{e}_curriculum/" for e in _candidates]}. '
+        f'Present: {glob.glob("runs/*/model.zip")}')
+ENV_ID = _found[0]
+print(f'Loading trained policy: {ENV_ID}')
+model = PPO.load(f'runs/{ENV_ID}_curriculum/model')   # no .zip — SB3 appends it
 
 # Find a good episode (reaches the goal) at mid difficulty.
 best = None

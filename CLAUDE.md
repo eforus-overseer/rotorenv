@@ -64,9 +64,28 @@ python examples/render_6dof.py     # live 3D window: tilting quad + trajectory t
 python examples/wrapped_agent.py   # wrappers + vectorized-env demo
 python examples/curriculum_demo.py # success-based curriculum on Waypoint-v0
 python examples/train_ppo.py --env HoverEasy-v0 --steps 50000   # train PPO (needs .[rl])
-pytest                             # full test suite (currently 75 tests)
+python examples/train_nav_curriculum.py --env Navigation6DOF-v0 --steps 200000  # curriculum nav
+pytest                             # full test suite (currently 99 tests)
 pytest tests/test_conformance.py   # Gymnasium check_env across all variants
 ```
+
+Optional extras: `pip install -e ".[rl]"` (stable-baselines3 for training),
+`pip install -e ".[render]"` (PyVista for cinematic/depth rendering).
+
+## Notebooks (author as .py, build the .ipynb)
+
+Do **not** hand-write `.ipynb` JSON — it's heavy and unreviewable. Author the
+notebook as a percent-format `.py` (`# %%` code cells, `# %% [markdown]` prose)
+under `notebooks/`, then build the `.ipynb` with the converter:
+
+```bash
+python scripts/build_notebook.py notebooks/rotorenv_colab_train.py
+```
+
+Commit the `.py` source; the generated `notebooks/*.ipynb` is git-ignored
+(a build artifact). The Colab training notebook lives at
+`notebooks/rotorenv_colab_train.py` — vision-nav (depth+CNN) is GPU-bound, so
+run it on Colab, not CPU.
 
 ## Architecture — keep these concerns separate
 
@@ -75,11 +94,17 @@ them into the env loop.
 
 ```
 rotorenv/
-├── core/        DroneState, DroneAction, reward terms, rotations.py (frame utils)
+├── core/        DroneState, DroneAction, reward terms, enums, rotations.py
 ├── physics/     DronePhysics Protocol + PointMassPhysics + SixDOFPhysics
-├── envs/        DroneEnv base (all Gym plumbing) + HoverEnv task
-└── rendering/   Matplotlib 3D renderer (lazy-imported, attitude-aware)
+├── envs/        DroneEnv base + tasks (Hover/Waypoint/Trajectory/Navigation)
+│                + CurriculumWrapper + obs/reward wrappers
+└── rendering/   MatplotlibRenderer (default, lazy) + PyVistaRenderer +
+                 DepthCamera (both optional, [render] extra)
 ```
+
+Tasks (each a `DroneEnv` subclass): `HoverEnv`, `WaypointEnv` (sampled target),
+`TrajectoryEnv` (moving Lissajous target), `NavigationEnv` (procedural obstacle
+field → goal, `perception` = `"state"` | `"depth"`).
 
 - **Physics is a `typing.Protocol`** (`physics/base_physics.py`). A new backend
   only needs a matching `step(state, action) -> DroneState` and a `dt` attribute.
@@ -93,7 +118,10 @@ rotorenv/
   converts to Euler only at the `DroneState` boundary (the fixed contract).
 - **Reward is data, not code.** A task's shaping is a list of `RewardTerm`
   objects summed by `CompositeReward` (`core/reward.py`). Add behaviour by adding
-  a term, not by editing a monolithic reward function.
+  a term, not by editing a monolithic reward function. Most terms are pure
+  functions; `ProgressReward` is the exception (stateful — holds last distance,
+  needs `reset(spawn, target)` per episode). It gives dense step-wise shaping
+  and is what makes long goal-reaching tasks learnable.
 - **Tasks subclass `DroneEnv`** and implement only four hooks: `_initial_state`,
   `_make_target`, `_build_reward`, `_is_terminated` (+ optional `_is_truncated`).
   They never re-implement `step()` or the spaces.
@@ -155,6 +183,14 @@ it passes `check_env` and works with normalization wrappers — never revert to
   by it. The `CurriculumWrapper` *drives* that value (success-based or
   step-annealed) — the env stays a pure MDP, the schedule stays composable. Keep
   it that way: no training-history state inside the env.
+- **Depth perception is the heavy path; isolate it.** `NavigationEnv(perception=
+  "depth")` renders an off-screen depth image per step via `DepthCamera` (~490
+  steps/s vs ~22k for state). The image obs is channel-first `(1,H,W)`,
+  pre-normalised to `[0,1]` → CNN-PPO needs `policy_kwargs={"normalize_images":
+  False}`. Gotcha that cost a run: `get_image_depth()` needs `show(...,
+  store_image_depth=True)`; the camera rebuilds per episode, so `capture()` also
+  retries defensively if the buffer is dropped. Long training checkpoints
+  `model.zip` every 10k steps because these runs can crash/disconnect.
 
 ## Working agreement
 

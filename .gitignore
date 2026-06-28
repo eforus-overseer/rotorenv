@@ -24,3 +24,7 @@ env/
 
 # Training artifacts (models, logs, plots)
 runs/
+
+# Generated notebooks — author the .py source, build .ipynb with
+# scripts/build_notebook.py (a heavy artifact, not committed).
+notebooks/*.ipynb

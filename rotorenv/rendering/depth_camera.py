@@ -90,7 +90,14 @@ class DepthCamera:
         self.plotter.camera.up = tuple(up)
         self.plotter.render()
 
-        depth = self.plotter.get_image_depth(fill_value=np.nan)  # (H, W), -Z, NaN sky
+        try:
+            depth = self.plotter.get_image_depth(fill_value=np.nan)  # (H,W), -Z, NaN sky
+        except RuntimeError:
+            # The depth buffer can be dropped across some plotter state changes;
+            # re-prime with store_image_depth and retry once (robust over the
+            # hundreds of plotter lifecycles a training run creates).
+            self.plotter.show(auto_close=False, store_image_depth=True)
+            depth = self.plotter.get_image_depth(fill_value=np.nan)
         depth = -np.asarray(depth, dtype=np.float32)             # -> positive distance
         depth[~np.isfinite(depth)] = self.max_depth              # sky -> far
         depth = np.clip(depth, 0.0, self.max_depth) / self.max_depth

@@ -42,14 +42,19 @@ def main() -> None:
         this surfaces that the curriculum is actually advancing.
         """
 
-        def __init__(self, every: int = 10_000) -> None:
+        def __init__(self, every: int = 10_000, save_path: str | None = None) -> None:
             super().__init__()
             self.every = every
+            self.save_path = save_path
 
         def _on_step(self) -> bool:
             if self.num_timesteps % self.every < self.training_env.num_envs:
                 diff = self.training_env.envs[0].env.difficulty
-                print(f"  [{self.num_timesteps:>7,} steps]  curriculum difficulty = {diff:.2f}")
+                print(f"  [{self.num_timesteps:>7,} steps]  curriculum difficulty = {diff:.2f}",
+                      flush=True)
+                # Checkpoint mid-training so a later crash never loses progress.
+                if self.save_path is not None:
+                    self.model.save(self.save_path)
             return True
 
     out_dir = os.path.join("runs", f"{args.env}_curriculum")
@@ -79,7 +84,11 @@ def main() -> None:
     model = PPO(policy, train_env, seed=args.seed, policy_kwargs=policy_kwargs, verbose=0)
     print(f"Training PPO ({policy}) on {args.env} with success-based curriculum "
           f"for {args.steps:,} steps...")
-    model.learn(total_timesteps=args.steps, callback=ProgressLogger(every=10_000))
+    ckpt_path = os.path.join(out_dir, "model.zip")
+    model.learn(
+        total_timesteps=args.steps,
+        callback=ProgressLogger(every=10_000, save_path=ckpt_path),
+    )
 
     final_difficulty = train_env.envs[0].env.difficulty
     print(f"\nFinal curriculum difficulty reached: {final_difficulty:.2f} (0=empty, 1=max)")

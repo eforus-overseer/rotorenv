@@ -40,10 +40,17 @@ vision-based drone. Trained with PPO + a CNN policy.
 ![depth perception](docs/media/depth_perception.png)
 
 > Left: the scene. Right: the 64×64 depth image the agent actually sees (near =
-> dark, far/sky = light). A short proof-of-pipeline CNN-PPO run learns to *avoid
-> obstacles* (reward −181 → −59) but not yet to reach the goal — vision-nav
-> needs far more training (millions of steps, ideally a GPU), as in PEDRA. The
-> pipeline is validated; the policy is not a finished navigator.
+> dark, far/sky = light). Vision-nav is compute-bound — train it on a GPU.
+
+### Train on Colab (free GPU)
+
+Vision navigation (depth + CNN) needs a GPU to be tractable. A ready-to-run
+notebook handles install, headless rendering, and training:
+
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/eforus-overseer/rotorenv/blob/main/notebooks/rotorenv_colab_train.ipynb)
+
+`notebooks/rotorenv_colab_train.ipynb` — sanity-trains the fast state policy,
+then the vision (depth-camera) policy, then renders a flight GIF.
 
 ## Status
 

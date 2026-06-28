@@ -64,6 +64,9 @@ class NavigationEnv(DroneEnv):
             boxes for the current episode.
     """
 
+    #: Depth-image dimensions for ``perception="depth"`` (H, W).
+    DEPTH_SHAPE = (64, 64)
+
     def __init__(self, perception: str = "state", **kwargs) -> None:
         """Store perception mode and initialise the base env."""
         if perception not in ("state", "depth"):
@@ -72,15 +75,68 @@ class NavigationEnv(DroneEnv):
             )
         self.perception = perception
         self.obstacles: np.ndarray = np.zeros((0, 6), dtype=np.float64)
+        self._depth_camera = None
+        self._initialized = False
         super().__init__(**kwargs)
+        self._initialized = True
+
+        # In depth mode the observation is an image, not the kinematic vector,
+        # so override the Box the base class built (gym-pybullet-drones'
+        # KIN-vs-RGB pattern: the space itself depends on perception).
+        if self.perception == "depth":
+            from gymnasium import spaces
+
+            h, w = self.DEPTH_SHAPE
+            # Channel-first (1, H, W) to match stable-baselines3's CNN convention.
+            self.observation_space = spaces.Box(
+                low=0.0, high=1.0, shape=(1, h, w), dtype=np.float32
+            )
+
+    def _build_depth_camera(self):
+        """Construct a fresh depth camera for the current obstacle layout."""
+        from rotorenv.rendering.depth_camera import DepthCamera
+
+        if self._depth_camera is not None:
+            self._depth_camera.close()
+        h, w = self.DEPTH_SHAPE
+        self._depth_camera = DepthCamera(
+            self.obstacles, height=h, width=w, max_depth=12.0
+        )
+
+    def _get_obs(self, state: DroneState) -> np.ndarray:
+        """Return the observation for the active perception mode.
+
+        ``"state"`` defers to the base kinematic vector; ``"depth"`` renders the
+        onboard depth image (building the camera lazily on first use).
+        """
+        if self.perception == "state":
+            return super()._get_obs(state)
+        if self._depth_camera is None:
+            self._build_depth_camera()
+        return self._depth_camera.capture(state)
 
     # ------------------------------------------------------------------ #
     # Task setup.                                                         #
     # ------------------------------------------------------------------ #
     def _make_target(self) -> np.ndarray:
-        """Set the goal and (re)generate the obstacle field for this episode."""
+        """Set the goal and (re)generate the obstacle field for this episode.
+
+        In depth mode the camera scene is tied to the obstacle layout, so it is
+        rebuilt here whenever a new layout is generated.
+        """
         self.obstacles = self._generate_obstacles()
+        # Rebuild the camera only once the env is fully constructed (skip the
+        # base-class __init__ call, which has no real episode yet).
+        if self.perception == "depth" and getattr(self, "_initialized", False):
+            self._build_depth_camera()
         return GOAL_POSITION.copy()
+
+    def close(self) -> None:
+        """Release the depth camera (if any) and base rendering resources."""
+        if self._depth_camera is not None:
+            self._depth_camera.close()
+            self._depth_camera = None
+        super().close()
 
     def _generate_obstacles(self) -> np.ndarray:
         """Sample difficulty-scaled box obstacles avoiding start/goal clearance.

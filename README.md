@@ -25,8 +25,21 @@ curriculum difficulty.
 
 ![navigation](docs/media/navigation_orbit.gif)
 
-> Flown here by a *scripted* controller just to show the procedural layout — no
-> trained navigation policy yet (perception/training is the next phase).
+> Flown here by a *scripted* controller just to show the procedural layout.
+
+### Vision-based perception (PEDRA-style)
+
+`NavigationDepth-v0` gives the agent an **onboard depth camera** instead of a
+state vector — it must extract obstacle structure from pixels, like a real
+vision-based drone. Trained with PPO + a CNN policy.
+
+![depth perception](docs/media/depth_perception.png)
+
+> Left: the scene. Right: the 64×64 depth image the agent actually sees (near =
+> dark, far/sky = light). A short proof-of-pipeline CNN-PPO run learns to *avoid
+> obstacles* (reward −181 → −59) but not yet to reach the goal — vision-nav
+> needs far more training (millions of steps, ideally a GPU), as in PEDRA. The
+> pipeline is validated; the policy is not a finished navigator.
 
 ## Status
 

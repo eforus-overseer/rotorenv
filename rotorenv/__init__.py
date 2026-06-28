@@ -42,6 +42,8 @@ _VARIANTS: dict[str, tuple[str, int, dict[str, Any]]] = {
     # Navigation family (Phase 6): procedural obstacle field -> goal.
     "Navigation-v0": (_NAVIGATION, 750, {}),
     "Navigation6DOF-v0": (_NAVIGATION, 750, {"physics_model": "six_dof"}),
+    # Vision navigation: onboard depth-camera perception (PEDRA-style, heavy).
+    "NavigationDepth-v0": (_NAVIGATION, 750, {"physics_model": "six_dof", "perception": "depth"}),
 }
 
 for _env_id, (_entry, _max_steps, _kwargs) in _VARIANTS.items():

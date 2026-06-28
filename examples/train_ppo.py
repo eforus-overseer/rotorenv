@@ -75,8 +75,14 @@ def train(env_id: str, steps: int, seed: int, out_dir: str) -> str:
         verbose=1,
     )
 
-    model = PPO("MlpPolicy", train_env, seed=seed, verbose=1)
-    print(f"\nTraining PPO on {env_id} for {steps:,} steps "
+    # Image observations (depth perception) need a CNN; vectors use an MLP.
+    # Our depth image is pre-normalised to [0, 1], so disable SB3's uint8
+    # [0, 255] image normalisation.
+    is_image = len(train_env.observation_space.shape) == 3
+    policy = "CnnPolicy" if is_image else "MlpPolicy"
+    policy_kwargs = {"normalize_images": False} if is_image else None
+    model = PPO(policy, train_env, seed=seed, policy_kwargs=policy_kwargs, verbose=1)
+    print(f"\nTraining PPO ({policy}) on {env_id} for {steps:,} steps "
           f"(eval every {eval_freq:,})...\n")
     model.learn(total_timesteps=steps, callback=eval_cb, progress_bar=False)
 

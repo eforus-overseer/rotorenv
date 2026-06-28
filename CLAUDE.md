@@ -8,14 +8,16 @@ Guidance for Claude Code (and humans) working in this repository.
 reinforcement learning environment for training autonomous quadrotor agents. Pure
 Python, physics-first, built to be extended incrementally in phases.
 
-**Current phase: Phase 6 (in progress)** — "MiniGrid in 3D" procedural
-navigation. `NavigationEnv`: random pillar obstacle field, fly start→goal
-without colliding, obstacle count scales with curriculum difficulty. Mechanics
-(collision, goal, reward, layout) are done + tested; `Navigation-v0` /
-`Navigation6DOF-v0` registered. **Next:** PEDRA-style depth-camera perception
-(`perception="depth"`) + CNN policy — the user explicitly chose pixel perception
-over state-vector, which means renderer-in-the-training-loop (slow, GPU/long-run
-territory; see [[rotorenv-vision-3d-navigation]]).
+**Current phase: Phase 6 (complete)** — "MiniGrid in 3D" procedural navigation
+with PEDRA-style vision perception. `NavigationEnv`: random pillar field, fly
+start→goal without colliding, obstacle count scales with curriculum difficulty.
+Two perception modes: `"state"` (kinematic vector, ~22k steps/s) and `"depth"`
+(onboard 64×64 depth camera via PyVista, ~490 steps/s — channel-first `(1,H,W)`,
+pre-normalised so PPO needs `policy_kwargs={"normalize_images": False}` +
+`CnnPolicy`). Registered: `Navigation-v0`, `Navigation6DOF-v0`,
+`NavigationDepth-v0`. Pipeline validated (CNN-PPO reward −181→−59 over 15k steps
+= learns obstacle avoidance, NOT goal-reaching; vision-nav needs millions of
+steps / GPU). See [[rotorenv-vision-3d-navigation]].
 
 Phase 5 — PPO training pipeline. `examples/train_ppo.py` trains/eval/plots/
 replays SB3 PPO; SB3 is the optional `[rl]` extra. Env verified learnable

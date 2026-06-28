@@ -53,8 +53,13 @@ def main() -> None:
         return Monitor(env)
 
     train_env = DummyVecEnv([make_curr])
-    model = PPO("MlpPolicy", train_env, seed=args.seed, verbose=0)
-    print(f"Training PPO on {args.env} with success-based curriculum "
+    # Image observations (depth perception) need a CNN with image-normalisation
+    # disabled (our depth is already [0, 1]); state vectors use an MLP.
+    is_image = len(train_env.observation_space.shape) == 3
+    policy = "CnnPolicy" if is_image else "MlpPolicy"
+    policy_kwargs = {"normalize_images": False} if is_image else None
+    model = PPO(policy, train_env, seed=args.seed, policy_kwargs=policy_kwargs, verbose=0)
+    print(f"Training PPO ({policy}) on {args.env} with success-based curriculum "
           f"for {args.steps:,} steps...")
     model.learn(total_timesteps=args.steps)
 

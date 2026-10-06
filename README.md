@@ -238,3 +238,11 @@ throttle hover.
 ## License
 
 MIT
+
+---
+
+<!-- demo-lab:start -->
+## Explore this project
+
+[Project page & walkthrough](https://eforus-overseer.github.io/demo-lab/projects/rotorenv/) — Watch original agent recordings and explore the method and source artifacts.
+<!-- demo-lab:end -->

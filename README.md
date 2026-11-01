@@ -246,3 +246,11 @@ MIT
 
 [Project page & walkthrough](https://eforus-overseer.github.io/demo-lab/projects/rotorenv/) — Watch original agent recordings and explore the method and source artifacts.
 <!-- demo-lab:end -->
+
+
+<!-- codex-pixel-art -->
+## Pixel art
+
+![Pixel art for rotorenv](assets/pixel-art.svg)
+
+A small visual signature for this repository.
